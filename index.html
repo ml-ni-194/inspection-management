@@ -196,9 +196,14 @@
             color: #991b1b;
         }
 
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
+        .status-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-loading {
+            background: #f3f4f6;
+            color: #374151;
         }
 
         @media (max-width: 768px) {
@@ -302,6 +307,43 @@
             loadDataFromSpreadsheet();
         });
 
+        // 日付フォーマット関数（修正版）
+        function formatDateFromISO(dateString) {
+            if (typeof dateString === 'string' && dateString.includes('T')) {
+                // ISO形式の場合、日付部分のみを取得（時差の影響を回避）
+                return dateString.split('T')[0];
+            } else if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // すでにYYYY-MM-DD形式の場合
+                return dateString;
+            } else {
+                // その他の場合は変換を試行
+                try {
+                    const date = new Date(dateString);
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                } catch (error) {
+                    console.error('日付変換エラー:', dateString, error);
+                    return dateString;
+                }
+            }
+        }
+
+        // ステータス表示
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.textContent = message;
+            statusEl.className = `status-indicator status-${type}`;
+            
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                    statusEl.className = '';
+                }, 3000);
+            }
+        }
+
         // スプレッドシートにデータ保存
         async function saveToSpreadsheet(date, count) {
             try {
@@ -325,24 +367,32 @@
             }
         }
 
-        // スプレッドシートからデータ読み込み
+        // スプレッドシートからデータ読み込み（修正版）
         async function loadDataFromSpreadsheet() {
             try {
                 showStatus('データを読み込み中...', 'loading');
                 
-                const response = await fetch(SCRIPT_URL + '?action=load');
+                const response = await fetch(SCRIPT_URL);
                 const result = await response.json();
                 
-                if (result.success && result.data) {
-                    // データを変換
-                    inspectionData = result.data.map((row, index) => ({
-                        id: index + 1,
-                        date: formatDate(new Date(row[0])),
-                        count: parseFloat(row[1]) || 0
-                    }));
+                console.log('スプレッドシートからの応答:', result);
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    // データを変換（日付処理を改善）
+                    inspectionData = result.data.map((row, index) => {
+                        const formattedDate = formatDateFromISO(row[0]);
+                        
+                        return {
+                            id: index + 1,
+                            date: formattedDate,
+                            count: parseFloat(row[1]) || 0
+                        };
+                    });
+                    
+                    console.log('変換後のデータ:', inspectionData);
                     
                     displayRecords();
-                    showStatus('データを読み込みました', 'success');
+                    showStatus(`${inspectionData.length}件のデータを読み込みました`, 'success');
                 } else {
                     console.log('スプレッドシートが空か、データがありません');
                     inspectionData = [];
@@ -352,30 +402,12 @@
             } catch (error) {
                 console.error('データ読み込みエラー:', error);
                 showStatus('データ読み込みに失敗しました', 'error');
+                inspectionData = [];
                 displayRecords();
             }
         }
 
-        // 日付フォーマット関数
-        function formatDate(date) {
-            return date.toISOString().split('T')[0];
-        }
-
-        // ステータス表示
-        function showStatus(message, type) {
-            const statusEl = document.getElementById('connectionStatus');
-            statusEl.textContent = message;
-            statusEl.className = `status-indicator status-${type}`;
-            
-            if (type !== 'loading') {
-                setTimeout(() => {
-                    statusEl.textContent = '';
-                    statusEl.className = '';
-                }, 3000);
-            }
-        }
-
-        // フォーム送信の処理（スプレッドシート連携版）
+        // フォーム送信の処理
         document.getElementById('inspectionForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -481,7 +513,7 @@
             }
         }
 
-        // 集計の計算（スプレッドシートから取得）
+        // 集計の計算
         async function calculateSummary() {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
@@ -510,8 +542,11 @@
                     return recordDate >= new Date(startDate) && recordDate <= new Date(endDate);
                 });
                 
+                console.log('集計対象データ:', filteredData);
+                
                 if (filteredData.length === 0) {
                     document.getElementById('summaryResult').innerHTML = '<div class="no-data">選択した期間にデータがありません</div>';
+                    showStatus('対象期間にデータがありません', 'info');
                     return;
                 }
                 
