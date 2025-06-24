@@ -307,40 +307,27 @@
             loadDataFromSpreadsheet();
         });
 
-        // 日付を正しい形式に変換する関数
+        // 日付を正しい形式に変換する関数（超シンプル版）
         function formatDateString(dateInput) {
             console.log('入力日付:', dateInput, typeof dateInput);
             
-            // 既に正しい形式（YYYY-MM-DD）の場合
+            // 既にYYYY-MM-DD形式の場合はそのまま返す
             if (typeof dateInput === 'string' && dateInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                console.log('既に正しい形式:', dateInput);
+                console.log('正しい形式をそのまま使用:', dateInput);
                 return dateInput;
             }
             
-            // ISO形式の場合
-            if (typeof dateInput === 'string' && dateInput.includes('T')) {
-                const result = dateInput.split('T')[0];
-                console.log('ISO形式から変換:', dateInput, '→', result);
-                return result;
-            }
-            
-            // 文字列形式やDateオブジェクトの場合
+            // その他の場合は変換
             try {
                 const date = new Date(dateInput);
-                if (isNaN(date.getTime())) {
-                    console.error('無効な日付:', dateInput);
-                    return dateInput;
-                }
-                
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
                 const result = `${year}-${month}-${day}`;
-                
-                console.log('日付変換:', dateInput, '→', result);
+                console.log('変換結果:', dateInput, '→', result);
                 return result;
             } catch (error) {
-                console.error('日付変換エラー:', dateInput, error);
+                console.error('変換エラー:', dateInput, error);
                 return dateInput;
             }
         }
