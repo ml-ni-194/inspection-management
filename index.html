@@ -307,41 +307,41 @@
             loadDataFromSpreadsheet();
         });
 
-        // 日付フォーマット関数（時差修正版）
-        function formatDateFromISO(dateString) {
-            console.log('元の日付データ:', dateString);
+        // 日付を正しい形式に変換する関数
+        function formatDateString(dateInput) {
+            console.log('入力日付:', dateInput, typeof dateInput);
             
-            if (typeof dateString === 'string' && dateString.includes('T')) {
-                // ISO形式の場合、日付部分のみを取得（時差の影響を完全に回避）
-                const dateOnly = dateString.split('T')[0];
-                console.log('ISO形式から日付のみ抽出:', dateOnly);
-                return dateOnly;
+            // 既に正しい形式（YYYY-MM-DD）の場合
+            if (typeof dateInput === 'string' && dateInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                console.log('既に正しい形式:', dateInput);
+                return dateInput;
             }
             
-            if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                // すでに正しい形式
-                console.log('すでに正しい形式:', dateString);
-                return dateString;
+            // ISO形式の場合
+            if (typeof dateInput === 'string' && dateInput.includes('T')) {
+                const result = dateInput.split('T')[0];
+                console.log('ISO形式から変換:', dateInput, '→', result);
+                return result;
             }
             
-            // Dateオブジェクトの場合も時差を考慮
+            // 文字列形式やDateオブジェクトの場合
             try {
-                const date = new Date(dateString);
+                const date = new Date(dateInput);
+                if (isNaN(date.getTime())) {
+                    console.error('無効な日付:', dateInput);
+                    return dateInput;
+                }
                 
-                // 時差を考慮した日付取得
-                const offsetMs = date.getTimezoneOffset() * 60000;
-                const localDate = new Date(date.getTime() - offsetMs);
-                
-                const year = localDate.getFullYear();
-                const month = String(localDate.getMonth() + 1).padStart(2, '0');
-                const day = String(localDate.getDate()).padStart(2, '0');
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
                 const result = `${year}-${month}-${day}`;
                 
-                console.log('時差修正後の日付:', result);
+                console.log('日付変換:', dateInput, '→', result);
                 return result;
             } catch (error) {
-                console.error('日付変換エラー:', dateString, error);
-                return dateString;
+                console.error('日付変換エラー:', dateInput, error);
+                return dateInput;
             }
         }
 
@@ -382,7 +382,7 @@
             }
         }
 
-        // スプレッドシートからデータ読み込み（完全修正版）
+        // スプレッドシートからデータ読み込み（表示修正版）
         async function loadDataFromSpreadsheet() {
             try {
                 showStatus('データを読み込み中...', 'loading');
@@ -393,27 +393,9 @@
                 console.log('スプレッドシートからの応答:', result);
                 
                 if (result.success && result.data && result.data.length > 0) {
-                    // データを変換（時差問題を完全に解決）
+                    // データを変換（日付表示を完全に修正）
                     inspectionData = result.data.map((row, index) => {
-                        let formattedDate;
-                        
-                        // 日付の処理を改善
-                        if (typeof row[0] === 'string' && row[0].includes('T')) {
-                            // ISO形式の場合は日付部分のみ使用
-                            formattedDate = row[0].split('T')[0];
-                        } else if (typeof row[0] === 'string' && row[0].includes('-')) {
-                            // 既に適切な形式の場合
-                            formattedDate = row[0];
-                        } else {
-                            // その他の場合
-                            const date = new Date(row[0]);
-                            const year = date.getFullYear();
-                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                            const day = String(date.getDate()).padStart(2, '0');
-                            formattedDate = `${year}-${month}-${day}`;
-                        }
-                        
-                        console.log(`データ${index + 1}: ${row[0]} → ${formattedDate}`);
+                        const formattedDate = formatDateString(row[0]);
                         
                         return {
                             id: index + 1,
@@ -510,7 +492,12 @@
                 return;
             }
             
-            const sortedData = [...inspectionData].sort((a, b) => new Date(b.date) - new Date(a.date));
+            // 日付でソート（新しい順）
+            const sortedData = [...inspectionData].sort((a, b) => {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateB - dateA;
+            });
             
             let html = `
                 <table class="records-table">
